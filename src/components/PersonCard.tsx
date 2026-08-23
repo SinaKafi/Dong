@@ -3,11 +3,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2, UserRound } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 import { ExpenseParticipants } from "./ExpenseParticipants";
 import { ExpenseRow } from "./ExpenseRow";
-import { formatMoney } from "@/lib/format";
+import { extractIntegerDigits, formatAmount, formatMoney } from "@/lib/format";
 import { paidBy } from "@/lib/settlement";
 import type { CurrencyCode, Participant } from "@/lib/types";
 
@@ -36,11 +37,19 @@ interface PersonCardProps {
 const expenseInputSchema = z.object({
   title: z.string().trim().min(1, "عنوان هزینه نمی‌تواند خالی باشد."),
   amount: z
-    .number({ invalid_type_error: "مبلغ باید عدد باشد." })
-    .finite("مبلغ باید عدد معتبر باشد.")
-    .positive("مبلغ باید بزرگ‌تر از صفر باشد."),
+    .string()
+    .transform((value) => extractIntegerDigits(value))
+    .refine((value) => value.length > 0, "مبلغ باید عدد باشد.")
+    .transform((value) => Number(value))
+    .refine((value) => Number.isSafeInteger(value), "مبلغ باید عدد معتبر باشد.")
+    .refine((value) => value > 0, "مبلغ باید بزرگ‌تر از صفر باشد."),
 });
-type ExpenseInput = z.infer<typeof expenseInputSchema>;
+type ExpenseFormValues = z.input<typeof expenseInputSchema>;
+type ExpenseInput = z.output<typeof expenseInputSchema>;
+
+type PendingDelete =
+  | { kind: "participant"; name: string }
+  | { kind: "expense"; expenseId: string; title: string };
 
 export function PersonCard({
   participant,
@@ -58,6 +67,7 @@ export function PersonCard({
   const [nameError, setNameError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   // Whether the user manually changed the new expense's participant selection.
   // Until touched, the selection always mirrors the current full participant set
   // (so adding a new group member updates the default selection too).
@@ -69,12 +79,13 @@ export function PersonCard({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<ExpenseInput>({
+  } = useForm<ExpenseFormValues, undefined, ExpenseInput>({
     resolver: zodResolver(expenseInputSchema),
-    defaultValues: { title: "", amount: 0 as unknown as number },
+    defaultValues: { title: "", amount: "" },
     mode: "onSubmit",
   });
 
@@ -93,16 +104,24 @@ export function PersonCard({
     } else {
       setActionError(null);
       setJustAdded(true);
-      reset({ title: "", amount: 0 as unknown as number });
+      reset({ title: "", amount: "" });
       setNewIncludedRaw(allParticipants.map((p) => p.id));
       setNewIncludedTouched(false);
       window.setTimeout(() => setJustAdded(false), 1500);
     }
   }
 
-  function handleRemoveParticipant() {
-    const error = onRemove(participant.id);
-    if (error) setActionError(error);
+  function confirmDelete() {
+    if (!pendingDelete) return;
+
+    if (pendingDelete.kind === "participant") {
+      const error = onRemove(participant.id);
+      if (error) setActionError(error);
+    } else {
+      onRemoveExpense(participant.id, pendingDelete.expenseId);
+    }
+
+    setPendingDelete(null);
   }
 
   return (
@@ -142,7 +161,13 @@ export function PersonCard({
         </div>
         <button
           type="button"
-          onClick={handleRemoveParticipant}
+          onClick={() => {
+            setActionError(null);
+            setPendingDelete({
+              kind: "participant",
+              name: participant.name.trim() || `نفر ${index + 1}`,
+            });
+          }}
           disabled={totalParticipants <= 2}
           aria-label="حذف این نفر"
           title={totalParticipants <= 2 ? "حداقل دو نفر باید باقی بمانند" : "حذف این نفر"}
@@ -170,7 +195,10 @@ export function PersonCard({
                 expense={e}
                 currency={currency}
                 participants={allParticipants}
-                onRemove={() => onRemoveExpense(participant.id, e.id)}
+                onRemove={() => {
+                  setActionError(null);
+                  setPendingDelete({ kind: "expense", expenseId: e.id, title: e.title });
+                }}
                 onSetIncluded={(ids) => onSetExpenseIncluded(participant.id, e.id, ids)}
               />
             ))}
@@ -203,17 +231,24 @@ export function PersonCard({
             <label className="sr-only" htmlFor={`exp-amount-${participant.id}`}>
               مبلغ
             </label>
-            <input
-              id={`exp-amount-${participant.id}`}
-              type="number"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="مبلغ"
-              min={1}
-              step={1}
-              {...register("amount", { setValueAs: (v) => (v === "" || v == null ? Number.NaN : Number(v)) })}
-              aria-invalid={errors.amount ? true : false}
-              className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            <Controller
+              control={control}
+              name="amount"
+              render={({ field }) => (
+                <input
+                  id={`exp-amount-${participant.id}`}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="مبلغ"
+                  value={field.value ? formatAmount(Number(field.value)) : ""}
+                  onChange={(e) => {
+                    field.onChange(extractIntegerDigits(e.target.value));
+                  }}
+                  aria-invalid={errors.amount ? true : false}
+                  className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                />
+              )}
             />
           </div>
         </div>
@@ -255,6 +290,19 @@ export function PersonCard({
           {justAdded ? "افزوده شد" : "افزودن هزینه"}
         </button>
       </form>
+
+      <ConfirmationDialog
+        open={pendingDelete !== null}
+        title={pendingDelete?.kind === "participant" ? "حذف شرکت‌کننده" : "حذف هزینه"}
+        description={
+          pendingDelete?.kind === "participant"
+            ? `اطلاعات "${pendingDelete.name}" و همه هزینه‌های ثبت‌شده برای او پاک می‌شود. این کار قابل بازگشت نیست.`
+            : `هزینه "${pendingDelete?.title ?? ""}" پاک می‌شود. این کار قابل بازگشت نیست.`
+        }
+        confirmLabel={pendingDelete?.kind === "participant" ? "بله، حذف کن" : "بله، هزینه را حذف کن"}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
     </article>
   );
 }
