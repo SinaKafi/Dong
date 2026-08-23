@@ -18,6 +18,7 @@ export function ExpenseSplitter() {
     updateName,
     removeParticipant,
     addExpense,
+    setExpenseIncluded,
     removeExpense,
     reset,
   } = useExpenseSplitter();
@@ -61,10 +62,12 @@ export function ExpenseSplitter() {
             participant={p}
             index={i}
             currency={state.currency}
+            allParticipants={state.participants.map((x) => ({ id: x.id, name: x.name }))}
             totalParticipants={state.participants.length}
             onNameChange={updateName}
             onRemove={removeParticipant}
             onAddExpense={addExpense}
+            onSetExpenseIncluded={setExpenseIncluded}
             onRemoveExpense={removeExpense}
           />
         ))}
