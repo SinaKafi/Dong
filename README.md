@@ -23,6 +23,11 @@ This repository is configured for static export so it can be deployed to GitHub 
 3. Under `Build and deployment`, set `Source` to `GitHub Actions`.
 4. Push to your default branch to trigger the deploy workflow.
 
+If you want the workflow to try enabling Pages automatically, add a repository secret named `PAGES_ENABLEMENT_TOKEN`:
+
+- Personal access token: needs `repo` scope or Pages write permission.
+- GitHub App token: needs `administration:write` and `pages:write`.
+
 ### Deployment behavior
 
 - The workflow builds the app and publishes the generated `out/` directory.

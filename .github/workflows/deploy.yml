@@ -17,18 +17,24 @@ jobs:
   build:
     if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
+    env:
+      PAGES_ENABLEMENT_TOKEN: ${{ secrets.PAGES_ENABLEMENT_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+      - name: Enable GitHub Pages
+        if: env.PAGES_ENABLEMENT_TOKEN != ''
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+          token: ${{ env.PAGES_ENABLEMENT_TOKEN }}
 
       - name: Install dependencies
         run: npm ci
@@ -40,7 +46,7 @@ jobs:
         run: npm run build
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./out
 
@@ -54,4 +60,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
