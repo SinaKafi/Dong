@@ -2,9 +2,9 @@
 
 import { RotateCcw, UserPlus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 import { CurrencySelector } from "./CurrencySelector";
 import { PersonCard } from "./PersonCard";
-import { ResetConfirmationDialog } from "./ResetConfirmationDialog";
 import { ShareResultButton } from "./ShareResultButton";
 import { SummaryCard } from "./SummaryCard";
 import { useExpenseSplitter } from "@/hooks/useExpenseSplitter";
@@ -90,8 +90,11 @@ export function ExpenseSplitter() {
         ) : null}
       </SummaryCard>
 
-      <ResetConfirmationDialog
+      <ConfirmationDialog
         open={resetOpen}
+        title="شروع حساب جدید"
+        description="همه شرکت‌کننده‌ها و هزینه‌ها پاک می‌شوند. این کار قابل بازگشت نیست. مطمئن هستید؟"
+        confirmLabel="بله، همه را پاک کن"
         onCancel={() => setResetOpen(false)}
         onConfirm={() => {
           reset();
