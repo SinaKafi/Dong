@@ -16,6 +16,8 @@ export interface Expense {
   id: string;
   title: string;
   amount: number; // integer, > 0
+  paidByParticipantId: string;
+  includedParticipantIds: string[]; // participants who share this expense
 }
 
 export interface Participant {
@@ -27,9 +29,9 @@ export interface Participant {
 export interface BalanceResult {
   participantId: string;
   name: string;
-  paid: number;
-  share: number;
-  balance: number; // paid - share; >0 creditor, <0 debtor, 0 settled
+  paid: number; // total amount paid by this participant
+  owed: number; // total share this participant owes across expenses
+  balance: number; // paid - owed; >0 creditor, <0 debtor, 0 settled
   status: "creditor" | "debtor" | "settled";
 }
 
@@ -41,13 +43,26 @@ export interface Transfer {
   amount: number;
 }
 
+/** An expense resolved with payer and included participant names, for display. */
+export interface ResolvedExpense {
+  id: string;
+  title: string;
+  amount: number;
+  paidByName: string;
+  includedNames: string[];
+}
+
 export interface SettlementResult {
   totalExpenses: number;
   participantCount: number;
-  sharePerPerson: number; // base equal share (floored)
-  remainder: number; // remainder distributed among first `remainder` people
+  /** True only when every expense includes every participant. */
+  allSharedByAll: boolean;
+  /** Equal share per person; meaningful only when allSharedByAll is true. */
+  sharePerPerson: number;
+  remainder: number;
   balances: BalanceResult[];
   transfers: Transfer[];
+  expenses: ResolvedExpense[];
 }
 
 export interface AppState {
