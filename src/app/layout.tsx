@@ -20,8 +20,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "دنگ حساب | تقسیم هزینه گروهی",
-  description: "محاسبه دنگ هر نفر و تسویه‌حساب گروهی با رابط کاربری شیشه‌ای.",
+  title: "تقسیم هزینه گروهی و محاسبه دنگ | دنگ حساب",
+  description:
+    "هزینه های سفر، رستوران، خرید و خانه را سریع بین اعضای گروه تقسیم کنید، سهم هر نفر را دقیق ببینید و تسویه نهایی را بدون حساب و کتاب دستی انجام دهید.",
+  applicationName: "دنگ حساب",
+  category: "finance",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "fa_IR",
+    siteName: "دنگ حساب",
+    title: "تقسیم هزینه گروهی و محاسبه دنگ | دنگ حساب",
+    description:
+      "هزینه های سفر، رستوران، خرید و خانه را سریع بین اعضای گروه تقسیم کنید، سهم هر نفر را دقیق ببینید و تسویه نهایی را بدون حساب و کتاب دستی انجام دهید.",
+  },
+  twitter: {
+    card: "summary",
+    title: "تقسیم هزینه گروهی و محاسبه دنگ | دنگ حساب",
+    description:
+      "هزینه های سفر، رستوران، خرید و خانه را سریع بین اعضای گروه تقسیم کنید و تسویه نهایی را بدون حساب و کتاب دستی انجام دهید.",
+  },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: ["/icon.svg"],
+  },
 };
 
 export const viewport: Viewport = {
