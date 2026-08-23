@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAmount, formatMoney, toPersianDigits } from "./format";
+import { extractIntegerDigits, formatAmount, formatMoney, toAsciiDigits, toPersianDigits } from "./format";
 
 describe("toPersianDigits", () => {
   it("converts ASCII digits to Persian", () => {
@@ -12,6 +12,26 @@ describe("toPersianDigits", () => {
 
   it("handles numeric input", () => {
     expect(toPersianDigits(1234)).toBe("۱۲۳۴");
+  });
+});
+
+describe("toAsciiDigits", () => {
+  it("converts Persian digits to ASCII", () => {
+    expect(toAsciiDigits("۱۲۳۴۵۶۷۸۹۰")).toBe("1234567890");
+  });
+
+  it("converts Arabic digits to ASCII", () => {
+    expect(toAsciiDigits("١٢٣٤٥٦٧٨٩٠")).toBe("1234567890");
+  });
+});
+
+describe("extractIntegerDigits", () => {
+  it("keeps ASCII digits from grouped localized input", () => {
+    expect(extractIntegerDigits("۱٬۲۳۴,۵۶۷")).toBe("1234567");
+  });
+
+  it("strips non-digit characters", () => {
+    expect(extractIntegerDigits(" مبلغ ۱۲a۳ ")).toBe("123");
   });
 });
 
