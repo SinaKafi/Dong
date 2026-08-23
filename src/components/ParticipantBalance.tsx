@@ -2,7 +2,7 @@
 
 import { CheckCircle2, TrendingDown, TrendingUp } from "lucide-react";
 import type { ReactElement } from "react";
-import { formatSignedMoney } from "@/lib/format";
+import { formatMoney, formatSignedMoney } from "@/lib/format";
 import type { BalanceResult, CurrencyCode } from "@/lib/types";
 
 interface ParticipantBalanceProps {
@@ -31,21 +31,22 @@ const STATUS_STYLES: Record<BalanceResult["status"], { chip: string; icon: React
 export function ParticipantBalance({ balance, currency }: ParticipantBalanceProps) {
   const s = STATUS_STYLES[balance.status];
   return (
-    <li
-      className={[
-        "flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5",
-        s.chip,
-      ].join(" ")}
-    >
-      <div className="flex min-w-0 items-center gap-2">
-        <span aria-hidden="true">{s.icon}</span>
-        <span className="truncate font-semibold">{balance.name}</span>
+    <li className={["flex flex-col gap-2 rounded-xl border px-3 py-2.5", s.chip].join(" ")}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span aria-hidden="true">{s.icon}</span>
+          <span className="truncate font-semibold">{balance.name}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-xs opacity-80">{s.label}</span>
+          <span className="font-mono tabular-nums">
+            {balance.balance === 0 ? formatMoney(0, currency) : formatSignedMoney(balance.balance, currency)}
+          </span>
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="text-xs opacity-80">{s.label}</span>
-        <span className="font-mono tabular-nums">
-          {balance.balance === 0 ? formatSignedMoney(0, currency) : formatSignedMoney(balance.balance, currency)}
-        </span>
+      <div className="flex items-center justify-between gap-3 text-xs opacity-80">
+        <span>پرداخت کرده: <span className="font-mono tabular-nums">{formatMoney(balance.paid, currency)}</span></span>
+        <span>سهم واقعی: <span className="font-mono tabular-nums">{formatMoney(balance.owed, currency)}</span></span>
       </div>
     </li>
   );
