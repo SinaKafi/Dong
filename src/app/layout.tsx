@@ -3,6 +3,15 @@ import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
+const repoName = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "";
+const explicitBasePath = process.env.BASE_PATH;
+const inferredBasePath = repoName && !repoName.endsWith(".github.io") ? `/${repoName}` : "";
+const basePath = explicitBasePath ?? inferredBasePath;
+
+function assetPath(path: string): string {
+  return `${basePath}${path}`;
+}
+
 const yekanBakh = localFont({
   src: "../../public/YekanBakhFaNum-Regular.ttf",
   variable: "--font-yekan-bakh",
@@ -51,8 +60,8 @@ export const metadata: Metadata = {
       "هزینه های سفر، رستوران، خرید و خانه را سریع بین اعضای گروه تقسیم کنید و تسویه نهایی را بدون حساب و کتاب دستی انجام دهید.",
   },
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: ["/icon.svg"],
+    icon: [{ url: assetPath("/dong-favicon.svg"), type: "image/svg+xml" }],
+    shortcut: [assetPath("/dong-favicon.svg")],
   },
 };
 

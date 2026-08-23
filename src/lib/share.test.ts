@@ -90,6 +90,6 @@ describe("buildShareText", () => {
     const list = [p("a", "آ", [expense("e1", "x", 500, "a", ["a", "b"])]), p("b", "ب")];
     const result = settle(list);
     const text = buildShareText(result, "aed");
-    expect(text).toContain("درهم");
+    expect(text).toContain("دلار");
   });
 });

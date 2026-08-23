@@ -9,7 +9,7 @@ export interface CurrencyInfo {
 export const CURRENCIES: readonly CurrencyInfo[] = [
   { code: "toman", label: "تومان", short: "تومان" },
   { code: "rial", label: "ریال", short: "ریال" },
-  { code: "aed", label: "درهم", short: "درهم" },
+  { code: "aed", label: "دلار", short: "دلار" },
 ] as const;
 
 export interface Expense {

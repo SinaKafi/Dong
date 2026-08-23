@@ -59,6 +59,6 @@ describe("formatMoney", () => {
   it("appends the currency label", () => {
     expect(formatMoney(13400, "toman")).toBe("۱۳٬۴۰۰ تومان");
     expect(formatMoney(100, "rial")).toBe("۱۰۰ ریال");
-    expect(formatMoney(250, "aed")).toBe("۲۵۰ درهم");
+    expect(formatMoney(250, "aed")).toBe("۲۵۰ دلار");
   });
 });

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Dong favicon</title>
+  <desc id="desc">A minimalist geometric letter D with a modern diagonal accent.</desc>
+  <rect width="64" height="64" rx="16" fill="#0F172A"/>
+  <path
+    d="M22 14H31.5C42.2696 14 51 22.7304 51 33.5C51 44.2696 42.2696 53 31.5 53H22V14Z"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="7"
+  />
+  <path
+    d="M32 23L43 33"
+    fill="none"
+    stroke="#22C55E"
+    stroke-linecap="round"
+    stroke-width="5"
+  />
+</svg>
