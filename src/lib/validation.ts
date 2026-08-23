@@ -8,6 +8,8 @@ export const expenseSchema = z.object({
     .finite("مبلغ باید عدد معتبر باشد.")
     .int("مبلغ باید عدد صحیح باشد.")
     .positive("مبلغ باید بزرگ‌تر از صفر باشد."),
+  paidByParticipantId: z.string(),
+  includedParticipantIds: z.array(z.string()).min(1, "حداقل یک نفر را برای تقسیم این هزینه انتخاب کنید."),
 });
 
 export const participantSchema = z.object({
