@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Dong
 
-## Getting Started
+Persian-first group expense splitter built with Next.js 16, React 19, and Tailwind CSS 4.
 
-First, run the development server:
+## Local development
+
+Install dependencies and start the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app will be available at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## GitHub Pages deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This repository is configured for static export so it can be deployed to GitHub Pages through GitHub Actions.
 
-## Learn More
+### One-time GitHub setup
 
-To learn more about Next.js, take a look at the following resources:
+1. Push this repository to GitHub.
+2. Open `Settings` -> `Pages`.
+3. Under `Build and deployment`, set `Source` to `GitHub Actions`.
+4. Push to your default branch to trigger the deploy workflow.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Deployment behavior
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- The workflow builds the app and publishes the generated `out/` directory.
+- For project pages such as `https://username.github.io/repo-name/`, the app automatically uses `/<repo-name>` as its `basePath` during CI builds.
+- For user or organization sites such as `https://username.github.io/`, no `basePath` is applied.
 
-## Deploy on Vercel
+### Custom domain or custom path override
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+If you want to force a different deployment path, set a repository or workflow environment variable named `BASE_PATH` before the build runs.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Examples:
+
+- Custom domain at the site root: `BASE_PATH=`
+- Deploy under a custom subpath: `BASE_PATH=/apps/dong`
+
+## Scripts
+
+```bash
+npm run dev
+npm run lint
+npm run build
+```
