@@ -39,14 +39,62 @@ function expenseShareMap(
   includedIds.forEach((id, index) => {
     // Rotate the remainder recipients so rounding bias is spread across
     // participants rather than always landing on index 0.
-    const rotatedIndex = (index - offset + n) % n;
+    const rotatedIndex = ((index - offset) % n + n) % n;
     shares.set(id, base + (rotatedIndex < remainder ? 1 : 0));
   });
   return shares;
 }
 
+interface PairTransferTotal {
+  firstId: string;
+  firstName: string;
+  secondId: string;
+  secondName: string;
+  netFromFirstToSecond: number;
+}
+
+/** Aggregate and net transfers only within the same unordered participant pair. */
+function normalizeTransfersByPair(transfers: readonly Transfer[]): Transfer[] {
+  const totalsByPair = new Map<string, PairTransferTotal>();
+
+  for (const transfer of transfers) {
+    const fromIsFirst = transfer.fromId < transfer.toId;
+    const firstId = fromIsFirst ? transfer.fromId : transfer.toId;
+    const secondId = fromIsFirst ? transfer.toId : transfer.fromId;
+    const pairKey = JSON.stringify([firstId, secondId]);
+    const signedAmount = fromIsFirst ? transfer.amount : -transfer.amount;
+    const existing = totalsByPair.get(pairKey);
+
+    if (existing) {
+      existing.netFromFirstToSecond += signedAmount;
+    } else {
+      totalsByPair.set(pairKey, {
+        firstId,
+        firstName: fromIsFirst ? transfer.fromName : transfer.toName,
+        secondId,
+        secondName: fromIsFirst ? transfer.toName : transfer.fromName,
+        netFromFirstToSecond: signedAmount,
+      });
+    }
+  }
+
+  return [...totalsByPair.values()].flatMap((pair) => {
+    if (pair.netFromFirstToSecond === 0) return [];
+    const firstOwesSecond = pair.netFromFirstToSecond > 0;
+    return [
+      {
+        fromId: firstOwesSecond ? pair.firstId : pair.secondId,
+        fromName: firstOwesSecond ? pair.firstName : pair.secondName,
+        toId: firstOwesSecond ? pair.secondId : pair.firstId,
+        toName: firstOwesSecond ? pair.secondName : pair.firstName,
+        amount: Math.abs(pair.netFromFirstToSecond),
+      },
+    ];
+  });
+}
+
 /**
- * Compute balances, shares, and a minimal set of transfers that settles the group.
+ * Compute balances, shares, and direct transfers to each expense payer.
  *
  * Each expense is divided independently: `expenseShare = amount /
  * includedParticipantIds.length`. The payer's `paid` total gets the full
@@ -55,8 +103,10 @@ function expenseShareMap(
  * sum of all expense shares equals the sum of all expense amounts, and the
  * payer accounting matches the share accounting exactly.
  *
- * Settlement uses a greedy largest-debtor × largest-creditor pairing, which
- * produces at most `n - 1` transfers (the theoretical minimum).
+ * Transfers preserve the original payment relationships: each included
+ * participant pays their share directly to the participant who paid the
+ * expense. Transfers are then aggregated and netted only within the same
+ * unordered participant pair; debts are never rerouted through a third person.
  */
 export function settle(participants: Participant[]): SettlementResult {
   const count = participants.length;
@@ -76,16 +126,18 @@ export function settle(participants: Participant[]): SettlementResult {
   }
 
   const nameById = new Map(participants.map((p) => [p.id, p.name]));
+  const paidById = new Map(participants.map((p) => [p.id, 0]));
+  const owedById = new Map(participants.map((p) => [p.id, 0]));
+  const directTransfers: Transfer[] = [];
 
-  // Per-expense share maps, keyed by expense id.
-  const expenseShares = new Map<string, Map<string, number>>();
+  // Expenses resolved with names for summary and sharing output.
   const resolvedExpenses: ResolvedExpense[] = [];
 
   let allSharedByAll = true;
   let expenseCounter = 0;
 
-  for (const payer of participants) {
-    for (const expense of payer.expenses) {
+  for (const owner of participants) {
+    for (const expense of owner.expenses) {
       // Drop included ids that no longer exist (participant was deleted).
       const includedIds = expense.includedParticipantIds.filter((id) =>
         nameById.has(id),
@@ -103,7 +155,30 @@ export function settle(participants: Participant[]): SettlementResult {
         expenseCounter,
       );
       expenseCounter += 1;
-      expenseShares.set(expense.id, shares);
+
+      const paidToDate = paidById.get(expense.paidByParticipantId) ?? 0;
+      paidById.set(
+        expense.paidByParticipantId,
+        paidToDate + Math.round(expense.amount),
+      );
+
+      for (const [participantId, share] of shares) {
+        const owedToDate = owedById.get(participantId) ?? 0;
+        owedById.set(participantId, owedToDate + share);
+
+        if (participantId === expense.paidByParticipantId || share === 0) {
+          continue;
+        }
+
+        const payerId = expense.paidByParticipantId;
+        directTransfers.push({
+          fromId: participantId,
+          fromName: nameById.get(participantId) ?? "—",
+          toId: payerId,
+          toName: nameById.get(payerId) ?? "—",
+          amount: share,
+        });
+      }
 
       resolvedExpenses.push({
         id: expense.id,
@@ -119,12 +194,8 @@ export function settle(participants: Participant[]): SettlementResult {
   if (resolvedExpenses.length === 0) allSharedByAll = true;
 
   const balances: BalanceResult[] = participants.map((p) => {
-    const paid = Math.round(paidBy(p));
-    let owed = 0;
-    for (const [, shares] of expenseShares) {
-      const share = shares.get(p.id);
-      if (share != null) owed += share;
-    }
+    const paid = paidById.get(p.id) ?? 0;
+    const owed = owedById.get(p.id) ?? 0;
     const balance = paid - owed;
     const status: BalanceResult["status"] =
       balance > 0 ? "creditor" : balance < 0 ? "debtor" : "settled";
@@ -141,56 +212,9 @@ export function settle(participants: Participant[]): SettlementResult {
     sharePerPerson: baseShare,
     remainder,
     balances,
-    transfers: generateTransfers(balances),
+    transfers: normalizeTransfersByPair(directTransfers),
     expenses: resolvedExpenses,
   };
-}
-
-/**
- * Produce the minimal transfer list from a set of balances whose sum is zero.
- * Greedy: always pair the largest debtor with the largest creditor.
- */
-export function generateTransfers(balances: BalanceResult[]): Transfer[] {
-  const debtors = balances
-    .filter((b) => b.balance < 0)
-    .map((b) => ({ id: b.participantId, name: b.name, amount: -b.balance }))
-    .sort((a, b) => b.amount - a.amount);
-
-  const creditors = balances
-    .filter((b) => b.balance > 0)
-    .map((b) => ({ id: b.participantId, name: b.name, amount: b.balance }))
-    .sort((a, b) => b.amount - a.amount);
-
-  const transfers: Transfer[] = [];
-  let di = 0;
-  let ci = 0;
-
-  while (di < debtors.length && ci < creditors.length) {
-    const debtor = debtors[di];
-    const creditor = creditors[ci];
-    if (debtor.amount === 0) {
-      di++;
-      continue;
-    }
-    if (creditor.amount === 0) {
-      ci++;
-      continue;
-    }
-    const amount = Math.min(debtor.amount, creditor.amount);
-    transfers.push({
-      fromId: debtor.id,
-      fromName: debtor.name,
-      toId: creditor.id,
-      toName: creditor.name,
-      amount,
-    });
-    debtor.amount -= amount;
-    creditor.amount -= amount;
-    if (debtor.amount === 0) di++;
-    if (creditor.amount === 0) ci++;
-  }
-
-  return transfers;
 }
 
 /** Whether the group is fully settled (no transfers required). */

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  generateTransfers,
   isFullySettled,
   paidBy,
   settle,
@@ -172,6 +171,23 @@ describe("settle — payer excluded from their own expense", () => {
     expect(hesam.balance).toBe(-150000);
     expect(morteza.owed).toBe(150000);
     expect(morteza.balance).toBe(-150000);
+    expect(r.transfers).toEqual([
+      { fromId: HESAM, fromName: "حسام", toId: SINA, toName: "سینا", amount: 150000 },
+      { fromId: MORTEZA, fromName: "مرتضی", toId: SINA, toName: "سینا", amount: 150000 },
+    ]);
+  });
+});
+
+describe("settle — one participant", () => {
+  it("does not create a transfer from the payer to themselves", () => {
+    const r = settle([
+      p(SINA, "سینا", [expense("e1", "x", 500, SINA, [SINA])]),
+    ]);
+
+    expect(r.balances).toEqual([
+      { participantId: SINA, name: "سینا", paid: 500, owed: 500, balance: 0, status: "settled" },
+    ]);
+    expect(r.transfers).toEqual([]);
   });
 });
 
@@ -232,11 +248,15 @@ describe("settle — rounding when an expense cannot divide evenly", () => {
     expect(totalOwed).toBe(1000); // no amount lost
     const shares = r.balances.map((b) => b.owed).sort((a, b) => a - b);
     expect(shares).toEqual([333, 333, 334]);
+    expect(r.transfers).toEqual([
+      { fromId: HESAM, fromName: "حسام", toId: SINA, toName: "سینا", amount: 333 },
+      { fromId: MORTEZA, fromName: "مرتضی", toId: SINA, toName: "سینا", amount: 333 },
+    ]);
   });
 });
 
 describe("settle — final settlement accuracy", () => {
-  it("produces transfers that settle the documented multi-expense example", () => {
+  it("aggregates repeated pairs without changing their payer relationship", () => {
     const list = [
       p(SINA, "سینا", [
         expense("e1", "شام", 900000, SINA, ALL),
@@ -246,12 +266,109 @@ describe("settle — final settlement accuracy", () => {
       p(MORTEZA, "مرتضی"),
     ];
     const r = settle(list);
-    // Sina +800k creditor, Hesam -200k debtor, Morteza -600k debtor.
-    // Greedy: largest debtor (Morteza 600k) pays Sina 600k, then Hesam pays Sina 200k.
+    // Each included participant pays their share to that expense's payer.
     expect(r.transfers).toEqual([
-      { fromId: MORTEZA, fromName: "مرتضی", toId: SINA, toName: "سینا", amount: 600000 },
-      { fromId: HESAM, fromName: "حسام", toId: SINA, toName: "سینا", amount: 200000 },
+      { fromId: HESAM, fromName: "حسام", toId: SINA, toName: "سینا", amount: 500000 },
+      { fromId: MORTEZA, fromName: "مرتضی", toId: SINA, toName: "سینا", amount: 300000 },
+      { fromId: MORTEZA, fromName: "مرتضی", toId: HESAM, toName: "حسام", amount: 300000 },
     ]);
+  });
+
+  it("keeps the direct transfers from the entered 9 + 4 example", () => {
+    const list = [
+      p(SINA, "sina", [expense("e1", "kharj", 9, SINA, [SINA, MORTEZA, HESAM])]),
+      p(MORTEZA, "mory"),
+      p(HESAM, "hesam", [expense("e2", "namaz", 4, HESAM, [HESAM, MORTEZA])]),
+    ];
+
+    const r = settle(list);
+
+    expect(r.balances).toEqual([
+      { participantId: SINA, name: "sina", paid: 9, owed: 3, balance: 6, status: "creditor" },
+      { participantId: MORTEZA, name: "mory", paid: 0, owed: 5, balance: -5, status: "debtor" },
+      { participantId: HESAM, name: "hesam", paid: 4, owed: 5, balance: -1, status: "debtor" },
+    ]);
+    expect(r.transfers).toEqual([
+      { fromId: MORTEZA, fromName: "mory", toId: SINA, toName: "sina", amount: 3 },
+      { fromId: HESAM, fromName: "hesam", toId: SINA, toName: "sina", amount: 3 },
+      { fromId: MORTEZA, fromName: "mory", toId: HESAM, toName: "hesam", amount: 2 },
+    ]);
+
+    for (const balance of r.balances) {
+      const sent = r.transfers
+        .filter((transfer) => transfer.fromId === balance.participantId)
+        .reduce((sum, transfer) => sum + transfer.amount, 0);
+      const received = r.transfers
+        .filter((transfer) => transfer.toId === balance.participantId)
+        .reduce((sum, transfer) => sum + transfer.amount, 0);
+      expect(balance.balance + sent - received).toBe(0);
+    }
+  });
+
+  it("uses paidByParticipantId instead of the expense owner array", () => {
+    const list = [
+      p(SINA, "سینا", [expense("e1", "شام", 9, SINA, ALL)]),
+      p(HESAM, "حسام", [expense("e2", "میان وعده", 4, MORTEZA, [MORTEZA, HESAM])]),
+      p(MORTEZA, "مرتضی"),
+    ];
+
+    const r = settle(list);
+    const sina = r.balances.find((b) => b.participantId === SINA)!;
+    const hesam = r.balances.find((b) => b.participantId === HESAM)!;
+    const morteza = r.balances.find((b) => b.participantId === MORTEZA)!;
+
+    expect(sina.balance).toBe(6);
+    expect(hesam.balance).toBe(-5);
+    expect(morteza.balance).toBe(-1);
+    expect(r.transfers).toEqual([
+      { fromId: HESAM, fromName: "حسام", toId: SINA, toName: "سینا", amount: 3 },
+      { fromId: MORTEZA, fromName: "مرتضی", toId: SINA, toName: "سینا", amount: 3 },
+      { fromId: HESAM, fromName: "حسام", toId: MORTEZA, toName: "مرتضی", amount: 2 },
+    ]);
+  });
+
+  it("nets opposite debts only within the same participant pair", () => {
+    const list = [
+      p(SINA, "sina", [expense("e1", "first", 6, SINA, [SINA, HESAM])]),
+      p(HESAM, "hesam", [expense("e2", "second", 2, HESAM, [SINA, HESAM])]),
+    ];
+
+    expect(settle(list).transfers).toEqual([
+      { fromId: HESAM, fromName: "hesam", toId: SINA, toName: "sina", amount: 2 },
+    ]);
+  });
+
+  it("returns at most one transfer for each unordered participant pair", () => {
+    const list = [
+      p(MORTEZA, "morteza", [
+        expense("e1", "hesam debt", 15066666, MORTEZA, [MORTEZA, HESAM]),
+        expense("e3", "sina debt", 15666666, MORTEZA, [MORTEZA, SINA]),
+      ]),
+      p(HESAM, "hesam", [
+        expense("e2", "morteza debt", 3000002, HESAM, [HESAM, MORTEZA]),
+        expense("e5", "sina debt", 4200000, HESAM, [HESAM, SINA]),
+      ]),
+      p(SINA, "sina", [
+        expense("e4", "morteza debt", 7800002, SINA, [SINA, MORTEZA]),
+        expense("e6", "hesam debt", 9680002, SINA, [SINA, HESAM]),
+      ]),
+    ];
+
+    const result = settle(list);
+    const transfers = result.transfers;
+    expect(transfers).toEqual([
+      { fromId: HESAM, fromName: "hesam", toId: MORTEZA, toName: "morteza", amount: 6033332 },
+      { fromId: SINA, fromName: "sina", toId: MORTEZA, toName: "morteza", amount: 3933332 },
+      { fromId: HESAM, fromName: "hesam", toId: SINA, toName: "sina", amount: 2740001 },
+    ]);
+
+    const pairKeys = transfers.map((transfer) =>
+      JSON.stringify([transfer.fromId, transfer.toId].sort()),
+    );
+    expect(new Set(pairKeys).size).toBe(pairKeys.length);
+    expect(result.balances.reduce((sum, balance) => sum + balance.paid, 0)).toBe(
+      result.balances.reduce((sum, balance) => sum + balance.owed, 0),
+    );
   });
 });
 
@@ -280,14 +397,15 @@ describe("settle — total debts always equal total credits", () => {
   });
 });
 
-describe("settle — already-settled group", () => {
-  it("has no transfers when everyone paid their share", () => {
+describe("settle — globally balanced group", () => {
+  it("removes pairwise debts that cancel exactly", () => {
     const list = [
       p(SINA, "سینا", [expense("e1", "x", 100, SINA, ALL)]),
       p(HESAM, "حسام", [expense("e2", "x", 100, HESAM, ALL)]),
       p(MORTEZA, "مرتضی", [expense("e3", "x", 100, MORTEZA, ALL)]),
     ];
     const r = settle(list);
+    expect(r.balances.every((balance) => balance.balance === 0)).toBe(true);
     expect(r.transfers).toEqual([]);
     expect(isFullySettled(r)).toBe(true);
   });
@@ -301,18 +419,5 @@ describe("settle — empty group", () => {
     expect(r.balances).toEqual([]);
     expect(r.transfers).toEqual([]);
     expect(r.expenses).toEqual([]);
-  });
-});
-
-describe("generateTransfers — minimal transfers", () => {
-  it("produces at most n-1 transfers", () => {
-    const list = [
-      p(SINA, "سینا", [expense("e1", "x", 100, SINA, [SINA, HESAM, MORTEZA])]),
-      p(HESAM, "حسام"),
-      p(MORTEZA, "مرتضی"),
-    ];
-    const r = settle(list);
-    expect(r.transfers.length).toBeLessThanOrEqual(2);
-    expect(generateTransfers(r.balances).length).toBeLessThanOrEqual(2);
   });
 });

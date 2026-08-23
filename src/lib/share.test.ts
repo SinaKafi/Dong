@@ -70,17 +70,15 @@ describe("buildShareText", () => {
       "- مرتضی: ۶۰۰٬۰۰۰ تومان",
       "",
       "تسویه:",
-      "مرتضی باید ۶۰۰٬۰۰۰ تومان به سینا پرداخت کند.",
-      "حسام باید ۲۰۰٬۰۰۰ تومان به سینا پرداخت کند.",
+      "حسام باید ۵۰۰٬۰۰۰ تومان به سینا پرداخت کند.",
+      "مرتضی باید ۳۰۰٬۰۰۰ تومان به سینا پرداخت کند.",
+      "مرتضی باید ۳۰۰٬۰۰۰ تومان به حسام پرداخت کند.",
     ].join("\n");
     expect(text).toBe(expected);
   });
 
   it("renders the settled message when no transfers are needed", () => {
-    const list = [
-      p("a", "آ", [expense("e1", "x", 100, "a", ["a", "b"])]),
-      p("b", "ب", [expense("e2", "x", 100, "b", ["a", "b"])]),
-    ];
+    const list = [p("a", "آ"), p("b", "ب")];
     const result = settle(list);
     const text = buildShareText(result, "rial");
     expect(text).toContain("حساب همه تسویه است و نیازی به انتقال پول نیست.");

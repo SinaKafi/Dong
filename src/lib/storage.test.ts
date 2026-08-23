@@ -120,6 +120,25 @@ describe("storage migration", () => {
     expect(state.participants[0].expenses[0].amount).toBe(500);
   });
 
+  it("drops expenses with zero or invalid amounts", () => {
+    setRaw({
+      currency: "toman",
+      participants: [
+        {
+          id: "a",
+          name: "آ",
+          expenses: [
+            { id: "zero", title: "zero", amount: 0 },
+            { id: "negative", title: "negative", amount: -1 },
+            { id: "invalid", title: "invalid", amount: Number.POSITIVE_INFINITY },
+          ],
+        },
+      ],
+    });
+
+    expect(readState()!.participants[0].expenses).toEqual([]);
+  });
+
   it("returns null when storage is empty", () => {
     storage.removeItem(KEY);
     expect(readState()).toBeNull();
