@@ -5,6 +5,7 @@ import { Plus, Trash2, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ExpenseParticipants } from "./ExpenseParticipants";
 import { ExpenseRow } from "./ExpenseRow";
 import { formatMoney } from "@/lib/format";
 import { paidBy } from "@/lib/settlement";
@@ -14,10 +15,21 @@ interface PersonCardProps {
   participant: Participant;
   index: number;
   currency: CurrencyCode;
+  allParticipants: Pick<Participant, "id" | "name">[];
   totalParticipants: number;
   onNameChange: (id: string, name: string) => string | null;
   onRemove: (id: string) => string | null;
-  onAddExpense: (id: string, title: string, amount: number) => string | null;
+  onAddExpense: (
+    payerId: string,
+    title: string,
+    amount: number,
+    includedIds: string[],
+  ) => string | null;
+  onSetExpenseIncluded: (
+    payerId: string,
+    expenseId: string,
+    includedIds: string[],
+  ) => string | null;
   onRemoveExpense: (participantId: string, expenseId: string) => void;
 }
 
@@ -34,16 +46,26 @@ export function PersonCard({
   participant,
   index,
   currency,
+  allParticipants,
   totalParticipants,
   onNameChange,
   onRemove,
   onAddExpense,
+  onSetExpenseIncluded,
   onRemoveExpense,
 }: PersonCardProps) {
   const [name, setName] = useState(participant.name);
   const [nameError, setNameError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState(false);
+  // Whether the user manually changed the new expense's participant selection.
+  // Until touched, the selection always mirrors the current full participant set
+  // (so adding a new group member updates the default selection too).
+  const [newIncludedRaw, setNewIncludedRaw] = useState<string[]>(allParticipants.map((p) => p.id));
+  const [newIncludedTouched, setNewIncludedTouched] = useState(false);
+  const newIncluded = newIncludedTouched
+    ? newIncludedRaw
+    : allParticipants.map((p) => p.id);
 
   const {
     register,
@@ -65,13 +87,15 @@ export function PersonCard({
 
   function onAddSubmit(values: ExpenseInput) {
     const rounded = Math.round(values.amount);
-    const error = onAddExpense(participant.id, values.title, rounded);
+    const error = onAddExpense(participant.id, values.title, rounded, newIncluded);
     if (error) {
       setActionError(error);
     } else {
       setActionError(null);
       setJustAdded(true);
       reset({ title: "", amount: 0 as unknown as number });
+      setNewIncludedRaw(allParticipants.map((p) => p.id));
+      setNewIncludedTouched(false);
       window.setTimeout(() => setJustAdded(false), 1500);
     }
   }
@@ -145,7 +169,9 @@ export function PersonCard({
                 key={e.id}
                 expense={e}
                 currency={currency}
+                participants={allParticipants}
                 onRemove={() => onRemoveExpense(participant.id, e.id)}
+                onSetIncluded={(ids) => onSetExpenseIncluded(participant.id, e.id, ids)}
               />
             ))}
           </ul>
@@ -191,6 +217,26 @@ export function PersonCard({
             />
           </div>
         </div>
+        <ExpenseParticipants
+          participants={allParticipants}
+          includedIds={newIncluded}
+          onToggle={(id) => {
+            setNewIncludedTouched(true);
+            setNewIncludedRaw(() =>
+              newIncluded.includes(id)
+                ? newIncluded.filter((x) => x !== id)
+                : [...newIncluded, id],
+            );
+          }}
+          onSelectAll={() => {
+            setNewIncludedTouched(true);
+            setNewIncludedRaw(allParticipants.map((p) => p.id));
+          }}
+          onClearAll={() => {
+            setNewIncludedTouched(true);
+            setNewIncludedRaw([]);
+          }}
+        />
         {(errors.title || errors.amount) ? (
           <p className="text-xs text-rose-300" role="alert">
             {errors.title?.message ?? errors.amount?.message}
