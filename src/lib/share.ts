@@ -1,16 +1,27 @@
 import { formatMoney } from "./format";
 import type { CurrencyCode, SettlementResult, Transfer } from "./types";
 
+/** Join Persian names with "،" and a final "و": "سینا، حسام و مرتضی". */
+export function joinNames(names: readonly string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join("، ")} و ${names[names.length - 1]}`;
+}
+
 /**
  * Build the shareable Persian report:
  *
  * 🧾 دنگ حساب
  *
  * کل هزینه: [amount] [currency]
- * دنگ هر نفر: [amount] [currency]
  *
- * پرداختی‌ها:
- * - [name]: [amount] [currency]
+ * هزینه‌ها:
+ * - [title] -- [amount] [currency]
+ *   پرداخت‌کننده: [payer]
+ *   تقسیم بین: [names]
+ *
+ * سهم نهایی افراد:
+ * - [name]: [owed]
  *
  * تسویه:
  * - [debtor] باید [amount] [currency] به [creditor] بدهد.
@@ -19,12 +30,23 @@ export function buildShareText(result: SettlementResult, currency: CurrencyCode)
   const lines: string[] = ["🧾 دنگ حساب", ""];
 
   lines.push(`کل هزینه: ${formatMoney(result.totalExpenses, currency)}`);
-  lines.push(`دنگ هر نفر: ${formatMoney(result.sharePerPerson, currency)}`);
   lines.push("");
 
-  lines.push("پرداختی‌ها:");
+  lines.push("هزینه‌ها:");
+  if (result.expenses.length === 0) {
+    lines.push("- هزینه‌ای ثبت نشده است.");
+  } else {
+    for (const e of result.expenses) {
+      lines.push(`- ${e.title} -- ${formatMoney(e.amount, currency)}`);
+      lines.push(`  پرداخت‌کننده: ${e.paidByName}`);
+      lines.push(`  تقسیم بین: ${joinNames(e.includedNames)}`);
+    }
+  }
+  lines.push("");
+
+  lines.push("سهم نهایی افراد:");
   for (const b of result.balances) {
-    lines.push(`- ${b.name}: ${formatMoney(b.paid, currency)}`);
+    lines.push(`- ${b.name}: ${formatMoney(b.owed, currency)}`);
   }
   lines.push("");
 
