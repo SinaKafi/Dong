@@ -1,4 +1,4 @@
-import type { AppState, CurrencyCode, Participant } from "./types";
+import type { AppState, CurrencyCode, Expense, Participant } from "./types";
 
 const STORAGE_KEY = "dong:state:v1";
 
@@ -62,22 +62,32 @@ function normalizeCurrency(v: unknown): CurrencyCode {
 
 function normalizeParticipants(v: unknown): Participant[] {
   if (!Array.isArray(v)) return [];
-  return v.flatMap((p) => {
-    const norm = normalizeParticipant(p);
-    return norm ? [norm] : [];
-  });
+  // First pass: collect all valid participant ids (for expense migration).
+  const rawParticipants: { id: string; name: string; rawExpenses: unknown }[] = [];
+  for (const p of v) {
+    if (typeof p !== "object" || p === null) continue;
+    const obj = p as Record<string, unknown>;
+    const id = obj["id"];
+    const name = obj["name"];
+    if (!isString(id) || !isString(name)) continue;
+    rawParticipants.push({ id, name, rawExpenses: obj["expenses"] });
+  }
+  const allIds = rawParticipants.map((p) => p.id);
+
+  // Second pass: normalize expenses, migrating legacy entries that lack
+  // paidByParticipantId / includedParticipantIds.
+  return rawParticipants.map((p) => ({
+    id: p.id,
+    name: p.name,
+    expenses: normalizeExpenses(p.rawExpenses, p.id, allIds),
+  }));
 }
 
-function normalizeParticipant(v: unknown): Participant | null {
-  if (typeof v !== "object" || v === null) return null;
-  const obj = v as Record<string, unknown>;
-  const id = obj["id"];
-  const name = obj["name"];
-  if (!isString(id) || !isString(name)) return null;
-  return { id, name, expenses: normalizeExpenses(obj["expenses"]) };
-}
-
-function normalizeExpenses(v: unknown): { id: string; title: string; amount: number }[] {
+function normalizeExpenses(
+  v: unknown,
+  ownerId: string,
+  allParticipantIds: readonly string[],
+): Expense[] {
   if (!Array.isArray(v)) return [];
   return v.flatMap((e) => {
     if (typeof e !== "object" || e === null) return [];
@@ -87,6 +97,25 @@ function normalizeExpenses(v: unknown): { id: string; title: string; amount: num
     const amount = obj["amount"];
     if (!isString(id) || !isString(title) || typeof amount !== "number") return [];
     if (!Number.isFinite(amount) || amount <= 0) return [];
-    return [{ id, title, amount: Math.round(amount) }];
+    // Migration: payer defaults to the owning participant (legacy layout had
+    // expenses nested under the person who paid).
+    const paidByParticipantId = isString(obj["paidByParticipantId"])
+      ? obj["paidByParticipantId"]
+      : ownerId;
+    // Migration: missing includedParticipantIds -> all current participants.
+    const includedRaw = obj["includedParticipantIds"];
+    const includedParticipantIds =
+      Array.isArray(includedRaw) && includedRaw.every(isString)
+        ? includedRaw.filter((id) => allParticipantIds.includes(id))
+        : [...allParticipantIds];
+    return [
+      {
+        id,
+        title,
+        amount: Math.round(amount),
+        paidByParticipantId,
+        includedParticipantIds,
+      },
+    ];
   });
 }
