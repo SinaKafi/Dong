@@ -57,6 +57,17 @@ function normalizeToMinimum(state: AppState): AppState {
   return { ...state, participants };
 }
 
+/** Remove a deleted participant's id from every expense's included list. */
+function pruneParticipantFromExpenses(participants: AppState["participants"], removedId: string): AppState["participants"] {
+  return participants.map((p) => ({
+    ...p,
+    expenses: p.expenses.map((e) => ({
+      ...e,
+      includedParticipantIds: e.includedParticipantIds.filter((id) => id !== removedId),
+    })),
+  }));
+}
+
 /**
  * Owns participants/currency state, persisted to localStorage, and exposes
  * validation-returning actions. Reads go through useSyncExternalStore so the
@@ -72,6 +83,7 @@ export function useExpenseSplitter() {
 
   const addParticipant = useCallback(() => {
     const s = getSnapshot();
+    // New participants are NOT added to existing expenses.
     update({ ...s, participants: [...s.participants, { id: makeId(), name: "", expenses: [] }] });
   }, []);
 
@@ -94,28 +106,77 @@ export function useExpenseSplitter() {
   const removeParticipant = useCallback((id: string): string | null => {
     const s = getSnapshot();
     if (s.participants.length <= 2) return "حداقل دو نفر باید در حساب باشند.";
-    update({ ...s, participants: s.participants.filter((p) => p.id !== id) });
+    const without = s.participants.filter((p) => p.id !== id);
+    const pruned = pruneParticipantFromExpenses(without, id);
+    update({ ...s, participants: pruned });
     return null;
   }, []);
 
   /** Returns a Persian error message, or null on success. */
-  const addExpense = useCallback((participantId: string, title: string, amount: number): string | null => {
-    const trimmedTitle = title.trim();
-    if (trimmedTitle === "") return "عنوان هزینه نمی‌تواند خالی باشد.";
-    if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0) {
-      return "مبلغ باید عدد صحیح و بزرگ‌تر از صفر باشد.";
-    }
-    const s = getSnapshot();
-    update({
-      ...s,
-      participants: s.participants.map((p) =>
-        p.id === participantId
-          ? { ...p, expenses: [...p.expenses, { id: makeId(), title: trimmedTitle, amount }] }
-          : p,
-      ),
-    });
-    return null;
-  }, []);
+  const addExpense = useCallback(
+    (payerId: string, title: string, amount: number, includedIds: string[]): string | null => {
+      const trimmedTitle = title.trim();
+      if (trimmedTitle === "") return "عنوان هزینه نمی‌تواند خالی باشد.";
+      if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0) {
+        return "مبلغ باید عدد صحیح و بزرگ‌تر از صفر باشد.";
+      }
+      const s = getSnapshot();
+      const existingIds = new Set(s.participants.map((p) => p.id));
+      const validIncluded = includedIds.filter((id) => existingIds.has(id));
+      if (validIncluded.length === 0) {
+        return "حداقل یک نفر را برای تقسیم این هزینه انتخاب کنید.";
+      }
+      update({
+        ...s,
+        participants: s.participants.map((p) =>
+          p.id === payerId
+            ? {
+                ...p,
+                expenses: [
+                  ...p.expenses,
+                  {
+                    id: makeId(),
+                    title: trimmedTitle,
+                    amount,
+                    paidByParticipantId: payerId,
+                    includedParticipantIds: validIncluded,
+                  },
+                ],
+              }
+            : p,
+        ),
+      });
+      return null;
+    },
+    [],
+  );
+
+  /** Toggle a participant's inclusion on an expense. Returns error or null. */
+  const setExpenseIncluded = useCallback(
+    (payerId: string, expenseId: string, includedIds: string[]): string | null => {
+      const s = getSnapshot();
+      const existingIds = new Set(s.participants.map((p) => p.id));
+      const validIncluded = includedIds.filter((id) => existingIds.has(id));
+      if (validIncluded.length === 0) {
+        return "حداقل یک نفر را برای تقسیم این هزینه انتخاب کنید.";
+      }
+      update({
+        ...s,
+        participants: s.participants.map((p) =>
+          p.id === payerId
+            ? {
+                ...p,
+                expenses: p.expenses.map((e) =>
+                  e.id === expenseId ? { ...e, includedParticipantIds: validIncluded } : e,
+                ),
+              }
+            : p,
+        ),
+      });
+      return null;
+    },
+    [],
+  );
 
   const removeExpense = useCallback((participantId: string, expenseId: string) => {
     const s = getSnapshot();
@@ -140,6 +201,7 @@ export function useExpenseSplitter() {
     updateName,
     removeParticipant,
     addExpense,
+    setExpenseIncluded,
     removeExpense,
     reset,
   };
