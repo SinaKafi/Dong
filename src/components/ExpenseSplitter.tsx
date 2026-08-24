@@ -27,23 +27,32 @@ export function ExpenseSplitter() {
   const [resetCount, setResetCount] = useState(0);
   const [step, setStep] = useState<1 | 2>(1);
 
-  const result = useMemo(() => settle(state.participants), [state.participants]);
+  const result = useMemo(
+    () => settle(state.participants),
+    [state.participants],
+  );
 
-  const canShare = result.participantCount >= 2 && state.participants.every((p) => p.name.trim() !== "");
+  const canShare =
+    result.participantCount >= 2 &&
+    state.participants.every((p) => p.name.trim() !== "");
 
   // Step 1 → 2 gate: 2+ participants, all named, all unique.
   const canProceed =
     state.participants.length >= 2 &&
     state.participants.every((p) => p.name.trim() !== "") &&
-    new Set(state.participants.map((p) => p.name.trim())).size === state.participants.length;
+    new Set(state.participants.map((p) => p.name.trim())).size ===
+      state.participants.length;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">دنگ حساب</h1>
+          <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+            دنگ حساب
+          </h1>
           <p className="mt-1 text-sm text-white/60">
-            هزینه‌های گروهی را وارد کنید؛ دنگ هر نفر و تسویه‌حساب خودکار محاسبه می‌شود.
+            هزینه‌های گروهی را وارد کنید؛ دنگ هر نفر و تسویه‌حساب خودکار محاسبه
+            می‌شود.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -59,22 +68,37 @@ export function ExpenseSplitter() {
       </header>
 
       {/* Stepper */}
-      <nav aria-label="مراحل" className="flex items-center gap-2 text-sm">
+      <nav
+        aria-label="مراحل"
+        className="sticky top-0 z-20 -mx-4 mb-2 flex items-center gap-2 rounded-b-2xl bg-slate-950/1 px-4 py-3 text-sm backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 border-b border-white/2"
+      >
         <span
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold transition-colors ${
-            step === 1 ? "bg-white/15 text-white" : "bg-white/5 text-white/50"
+            step === 1
+              ? "bg-white/15 text-white"
+              : "bg-white/5 text-white/50 cursor-pointer"
           }`}
+          onClick={() => setStep(1)}
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs">۱</span>
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs">
+            ۱
+          </span>
           افراد
         </span>
-        <span className="text-white/30" aria-hidden="true">›</span>
+        <span className="text-white/30" aria-hidden="true">
+          {">"}
+        </span>
         <span
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold transition-colors ${
-            step === 2 ? "bg-white/15 text-white" : "bg-white/5 text-white/50"
+            step === 2
+              ? "bg-white/15 text-white"
+              : "bg-white/5 text-white/50 cursor-pointer"
           }`}
+          onClick={() => setStep(2)}
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs">۲</span>
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs">
+            ۲
+          </span>
           هزینه‌ها و تسویه
         </span>
       </nav>
@@ -85,7 +109,10 @@ export function ExpenseSplitter() {
             <CurrencySelector value={state.currency} onChange={setCurrency} />
           </div>
 
-          <section aria-label="افراد" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <section
+            aria-label="افراد"
+            className="grid grid-cols-1 gap-4 lg:grid-cols-2"
+          >
             {state.participants.map((p, i) => (
               <PersonCard
                 key={`${resetCount}-${p.id}`}
@@ -93,7 +120,10 @@ export function ExpenseSplitter() {
                 participant={p}
                 index={i}
                 currency={state.currency}
-                allParticipants={state.participants.map((x) => ({ id: x.id, name: x.name }))}
+                allParticipants={state.participants.map((x) => ({
+                  id: x.id,
+                  name: x.name,
+                }))}
                 totalParticipants={state.participants.length}
                 onNameChange={updateName}
                 onRemove={removeParticipant}
@@ -142,7 +172,10 @@ export function ExpenseSplitter() {
             </button>
           </div>
 
-          <section aria-label="هزینه‌ها" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <section
+            aria-label="هزینه‌ها"
+            className="grid grid-cols-1 gap-4 lg:grid-cols-2"
+          >
             {state.participants.map((p, i) => (
               <PersonCard
                 key={`${resetCount}-${p.id}`}
@@ -150,7 +183,10 @@ export function ExpenseSplitter() {
                 participant={p}
                 index={i}
                 currency={state.currency}
-                allParticipants={state.participants.map((x) => ({ id: x.id, name: x.name }))}
+                allParticipants={state.participants.map((x) => ({
+                  id: x.id,
+                  name: x.name,
+                }))}
                 totalParticipants={state.participants.length}
                 onNameChange={updateName}
                 onRemove={removeParticipant}
@@ -162,7 +198,11 @@ export function ExpenseSplitter() {
           </section>
 
           <SummaryCard result={result} currency={state.currency}>
-            <ShareResultButton result={result} currency={state.currency} disabled={!canShare} />
+            <ShareResultButton
+              result={result}
+              currency={state.currency}
+              disabled={!canShare}
+            />
             {!canShare ? (
               <p className="text-center text-xs text-white/50">
                 برای ارسال نتیجه، نام همه افراد را وارد کنید.
