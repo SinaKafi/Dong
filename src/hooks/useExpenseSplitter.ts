@@ -87,19 +87,21 @@ export function useExpenseSplitter() {
     update({ ...s, participants: [...s.participants, { id: makeId(), name: "", expenses: [] }] });
   }, []);
 
-  /** Returns a Persian error message, or null on success. */
+  /** Always persists the raw name so it is cached on every keystroke (survives
+   *  reload even mid-edit). Returns a Persian error for an invalid name, but
+   *  still writes it -- the proceed gate (canProceed) enforces validity. */
   const updateName = useCallback((id: string, name: string): string | null => {
     const trimmed = name.trim();
-    if (trimmed === "") return "نام نمی‌تواند خالی باشد.";
     const s = getSnapshot();
-    if (s.participants.some((p) => p.id !== id && p.name.trim() === trimmed)) {
-      return "این نام قبلاً ثبت شده است.";
+    let error: string | null = null;
+    if (trimmed !== "" && s.participants.some((p) => p.id !== id && p.name.trim() === trimmed)) {
+      error = "این نام قبلاً ثبت شده است.";
     }
     update({
       ...s,
       participants: s.participants.map((p) => (p.id === id ? { ...p, name } : p)),
     });
-    return null;
+    return error;
   }, []);
 
   /** Returns a Persian error message, or null on success. */
